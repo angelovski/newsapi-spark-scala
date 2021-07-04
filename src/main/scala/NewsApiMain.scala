@@ -30,26 +30,34 @@ object NewsApiMain {
         val df: DataFrame = response.articles
           .toDF()
 
-//        {Author} {Title} {Date}
+        //        {Author} {Title} {Date}
         val res = df
-          .withColumn("date",col("publishedAt").substr(0, 10))
-          .withColumn("custom_field", concat(lit("{"),col("author"),lit("} "),
-            lit("{"),col("title"),lit("} "),
-            lit("{"),col("date"),lit("}")
+          .withColumn("date", col("publishedAt").substr(0, 10))
+          .withColumn("custom_field", concat(lit("{"), col("author"), lit("} "),
+            lit("{"), col("title"), lit("} "),
+            lit("{"), col("date"), lit("}")
           ))
+          .withColumn("year", col("publishedAt").substr(0, 4))
+          .withColumn("month", col("publishedAt").substr(6, 2))
         res.show()
 
         res.select("custom_field").show(20, truncate = false)
 
-//        store in HDFS
+        //        store in HDFS
 
         val conf = new Configuration()
         conf.set("fs.hdfs.impl", "org.apache.hadoop.hdfs.DistributedFileSystem")
         conf.set("fs.hdfs.impl", classOf[Nothing].getName)
         conf.set("fs.defaultFS", "hdfs://127.0.0.1:9000")
 
-//        val dfs = FileSystem.get(conf)
-        df.write.mode("Overwrite").format("Parquet").save("hdfs://127.0.0.1:9000/test.parquet")
+        //        partitioning:
+        val df_final = res.repartition(col("year"), col("month")).sort("publishedAt")
+
+        df_final.write
+          .partitionBy("year", "month")
+          .mode("Overwrite")
+          .format("Parquet")
+          .save("hdfs://127.0.0.1:9000/raw_data/" + "table_name")
 
       case None =>
         throw new RuntimeException(s"Please provide a valid api key as $NewsApiKeyEnv")
