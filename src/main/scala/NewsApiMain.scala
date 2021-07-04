@@ -1,7 +1,9 @@
 package com.angelovski
 
+import org.apache.hadoop.conf.Configuration
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.hadoop.fs.FileSystem
 
 object NewsApiMain {
   def main(args: Array[String]): Unit = {
@@ -38,6 +40,16 @@ object NewsApiMain {
         res.show()
 
         res.select("custom_field").show(20, truncate = false)
+
+//        store in HDFS
+
+        val conf = new Configuration()
+        conf.set("fs.hdfs.impl", "org.apache.hadoop.hdfs.DistributedFileSystem")
+        conf.set("fs.hdfs.impl", classOf[Nothing].getName)
+        conf.set("fs.defaultFS", "hdfs://127.0.0.1:9000")
+
+//        val dfs = FileSystem.get(conf)
+        df.write.mode("Overwrite").format("Parquet").save("hdfs://127.0.0.1:9000/test.parquet")
 
       case None =>
         throw new RuntimeException(s"Please provide a valid api key as $NewsApiKeyEnv")
