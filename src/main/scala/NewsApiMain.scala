@@ -3,7 +3,6 @@ package com.angelovski
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, SparkSession}
-import org.apache.hadoop.fs.FileSystem
 
 object NewsApiMain {
   def main(args: Array[String]): Unit = {
@@ -15,8 +14,12 @@ object NewsApiMain {
 
     val NewsApiKeyEnv = "NEWS_API_KEY"
 
-    val spark = SparkSession.builder().appName("NewsApi")
-      .master("local[*]").getOrCreate()
+    val spark = SparkSession
+      .builder()
+      .appName("NewsApi")
+      .master("local[*]")
+      .enableHiveSupport()
+      .getOrCreate()
 
 
     Option(System.getenv(NewsApiKeyEnv)) match {
@@ -58,6 +61,11 @@ object NewsApiMain {
           .mode("Overwrite")
           .format("Parquet")
           .save("hdfs://127.0.0.1:9000/raw_data/" + "table_name")
+
+      //        Hive:
+        import spark.sql
+        sql("CREATE TABLE IF NOT EXISTS src (key INT, value STRING) USING hive")
+
 
       case None =>
         throw new RuntimeException(s"Please provide a valid api key as $NewsApiKeyEnv")
