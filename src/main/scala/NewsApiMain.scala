@@ -11,6 +11,8 @@ object NewsApiMain {
 
     val phrase = args(0)
     val date = args(1)
+    val databaseName = args(2)
+    val tableName = args(3)
 
     val NewsApiKeyEnv = "NEWS_API_KEY"
 
@@ -60,12 +62,16 @@ object NewsApiMain {
           .partitionBy("year", "month")
           .mode("Overwrite")
           .format("Parquet")
-          .save("hdfs://127.0.0.1:9000/raw_data/" + "table_name")
+          .save("hdfs://127.0.0.1:9000/raw_data/" + tableName)
 
-      //        Hive:
+        //        Hive:
         import spark.sql
-        sql("CREATE TABLE IF NOT EXISTS src (key INT, value STRING) USING hive")
 
+        sql("CREATE DATABASE IF NOT EXISTS " + databaseName)
+        sql("USE " + databaseName)
+        val createTableStatement = "CREATE EXTERNAL TABLE IF NOT EXISTS " + tableName + "\n        (\n          title string,\n          id string,\n          name string,\n          author string,\n          description string,\n          published_at timestamp,\n          url string,\n          urlToImage string,\n          content string,\n          date_col string,\n          custom_field string)\n\n        PARTITIONED BY (year string,month string)\n        STORED AS PARQUET\n        LOCATION \"hdfs://127.0.0.1:9000/raw_data/" + tableName + "\""
+        sql(createTableStatement)
+        sql("msck repair table " + tableName)
 
       case None =>
         throw new RuntimeException(s"Please provide a valid api key as $NewsApiKeyEnv")
