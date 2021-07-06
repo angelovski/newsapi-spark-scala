@@ -6,7 +6,7 @@ import org.json4s.JsonAST.JString
 
 import java.sql.Timestamp
 import java.time.Instant
-import java.util.Date
+import java.sql.Date
 
 object NewsApi {
   case class Article(
@@ -20,6 +20,12 @@ object NewsApi {
                       content: String)
 
   case class Source(id: Option[String], name: String)
+
+  case class ArticleClean(
+                         date: Date,
+                         source: String,
+                         publishedAt: Timestamp,
+                         articles: String)
 
 
   object InstantSerializer extends CustomSerializer[Instant](_ => (

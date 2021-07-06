@@ -1,8 +1,14 @@
 package com.angelovski
 
+import NewsApi.{Article, ArticleClean}
+
 import org.apache.hadoop.conf.Configuration
+import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, SparkSession}
+
+import java.sql.Date
+import scala.collection.mutable.ListBuffer
 
 object NewsApiMain {
   def main(args: Array[String]): Unit = {
@@ -27,9 +33,19 @@ object NewsApiMain {
     Option(System.getenv(NewsApiKeyEnv)) match {
       case Some(apiKey) =>
         val client = NewsApiRestClient(apiKey)
-        val Right(response) = client.everything(phrase, from = Some(date), to = Some(date), sortBy = Some("publishedAt"), pageSize = Some(10), page = Some(1))
+        val Right(response) = client.everything(phrase, from = Some(date), to = Some(date), sortBy = Some("publishedAt"), pageSize = Some(100), page = Some(1))
         println(s"Found ${response.totalResults} headlines.")
-        response.articles.foreach(a => println(s"${a.publishedAt} - ${a.source.name} - ${a.title} - ${a.content}"))
+
+        //        Not implementing pagination because of API limitations for developer account. Otherwise:
+        //        val pageCount = (response.totalResults.toFloat / response.articles.size).ceil.toInt
+        //        val articles: Seq[Article] = response.articles
+        //
+        //        if (pageCount > 1) {
+        //          for (i <- 2 to pageCount) {
+        //            val Right(response) = client.everything(phrase, from = Some(date), to = Some(date), sortBy = Some("publishedAt"), pageSize = Some(10), page = Some(i))
+        //            articles ++ response.articles
+        //          }
+        //        }
 
         import spark.implicits._
         val df: DataFrame = response.articles
@@ -44,9 +60,18 @@ object NewsApiMain {
           ))
           .withColumn("year", col("publishedAt").substr(0, 4))
           .withColumn("month", col("publishedAt").substr(6, 2))
-        res.show()
+          .withColumn("article_clean", regexp_replace(col("content"), "[^a-zA-Z0-9 (),.?!-;:]", ""))
+          .withColumn("source_id", col("source").getItem("id"))
+          .withColumn("source_name", col("source").getItem("name"))
 
-        res.select("custom_field").show(20, truncate = false)
+        // combining all articles by date
+        val dateWindow = Window.partitionBy("date").orderBy("publishedAt")
+        val cleanArticlesByDateWindowDf = res.withColumn("articles_by_date", concat_ws("\n~\n", collect_list("article_clean").over(dateWindow)))
+        cleanArticlesByDateWindowDf.select("date", "articles_by_date").show(10, truncate = false)
+        // combining all articles by source_id
+        val sourceWindow = Window.partitionBy("source_id").orderBy("publishedAt")
+        val cleanArticlesBySourceWindowDf = res.withColumn("articles_by_source", concat_ws("\n===\n", collect_list("article_clean").over(sourceWindow)))
+        cleanArticlesBySourceWindowDf.select("source", "articles_by_source").show(10, truncate = false)
 
         //        store in HDFS
 
@@ -55,10 +80,10 @@ object NewsApiMain {
         conf.set("fs.hdfs.impl", classOf[Nothing].getName)
         conf.set("fs.defaultFS", "hdfs://127.0.0.1:9000")
 
-        //        partitioning:
-        val df_final = res.repartition(col("year"), col("month")).sort("publishedAt")
+        //        Raw data + partitioning:
+        val dfFinalRawData = res.repartition(col("year"), col("month")).sort("publishedAt")
 
-        df_final.write
+        dfFinalRawData.write
           .partitionBy("year", "month")
           .mode("Overwrite")
           .format("Parquet")
