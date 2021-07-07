@@ -51,8 +51,8 @@ object NewsApiMain {
         val df: DataFrame = response.articles
           .toDF()
 
-        //        {Author} {Title} {Date}
-        val res = df
+          //        {Author} {Title} {Date}
+          //        val res = df
           .withColumn("date", col("publishedAt").substr(0, 10))
           .withColumn("custom_field", concat(lit("{"), col("author"), lit("} "),
             lit("{"), col("title"), lit("} "),
@@ -66,12 +66,12 @@ object NewsApiMain {
 
         // combining all articles by date
         val dateWindow = Window.partitionBy("date").orderBy("publishedAt")
-        val cleanArticlesByDateWindowDf = res.withColumn("articles_by_date", concat_ws("\n~\n", collect_list("article_clean").over(dateWindow)))
-        cleanArticlesByDateWindowDf.select("date", "articles_by_date").show(10, truncate = false)
+        val dfByDate = df.withColumn("articles_by_date", concat_ws("\n~\n", collect_list("article_clean").over(dateWindow)))
+        dfByDate.select("date", "articles_by_date").show(10, truncate = false)
         // combining all articles by source_id
         val sourceWindow = Window.partitionBy("source_id").orderBy("publishedAt")
-        val cleanArticlesBySourceWindowDf = res.withColumn("articles_by_source", concat_ws("\n===\n", collect_list("article_clean").over(sourceWindow)))
-        cleanArticlesBySourceWindowDf.select("source", "articles_by_source").show(10, truncate = false)
+        val dfFinal = dfByDate.withColumn("articles_by_source", concat_ws("\n===\n", collect_list("article_clean").over(sourceWindow)))
+        dfFinal.select("source", "articles_by_source").show(10, truncate = false)
 
         //        store in HDFS
 
@@ -81,13 +81,16 @@ object NewsApiMain {
         conf.set("fs.defaultFS", "hdfs://127.0.0.1:9000")
 
         //        Raw data + partitioning:
-        val dfFinalRawData = res.repartition(col("year"), col("month")).sort("publishedAt")
-
-        dfFinalRawData.write
+        val dfFinalPartitioned = dfFinal
+          .sort("publishedAt")
+          .repartition(60)
+          .coalesce(60)
+        
+        dfFinalPartitioned.write
           .partitionBy("year", "month")
           .mode("Overwrite")
           .format("Parquet")
-          .save("hdfs://127.0.0.1:9000/raw_data/" + tableName)
+          .save("hdfs://127.0.0.1:9000/articles_data/" + tableName)
 
         //        Hive:
         import spark.sql
