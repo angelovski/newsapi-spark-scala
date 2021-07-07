@@ -85,7 +85,7 @@ object NewsApiMain {
           .sort("publishedAt")
           .repartition(60)
           .coalesce(60)
-        
+
         dfFinalPartitioned.write
           .partitionBy("year", "month")
           .mode("Overwrite")
@@ -95,11 +95,35 @@ object NewsApiMain {
         //        Hive:
         import spark.sql
 
-        sql("CREATE DATABASE IF NOT EXISTS " + databaseName)
-        sql("USE " + databaseName)
-        val createTableStatement = "CREATE EXTERNAL TABLE IF NOT EXISTS " + tableName + "\n        (\n          title string,\n          id string,\n          name string,\n          author string,\n          description string,\n          published_at timestamp,\n          url string,\n          urlToImage string,\n          content string,\n          date_col string,\n          custom_field string)\n\n        PARTITIONED BY (year string,month string)\n        STORED AS PARQUET\n        LOCATION \"hdfs://127.0.0.1:9000/raw_data/" + tableName + "\""
+        sql(s"CREATE DATABASE IF NOT EXISTS $databaseName")
+        sql(s"USE $databaseName")
+
+        val createTableStatement = s"""CREATE EXTERNAL TABLE IF NOT EXISTS $tableName
+                                     |(
+                                     |title string,
+                                     |id string,
+                                     |name string,
+                                     |author string,
+                                     |description string,
+                                     |published_at timestamp,
+                                     |url string,
+                                     |urlToImage string,
+                                     |content string,
+                                     |date_col string,
+                                     |custom_field string,
+                                     |article_clean string,
+                                     |source_id string,
+                                     |source_name string,
+                                     |articles_by_date string,
+                                     |articles_by_source string
+                                     |)
+                                     |
+                                     |PARTITIONED BY (year string,month string)
+                                     |STORED AS PARQUET
+                                     |LOCATION "hdfs://127.0.0.1:9000/articles_data/$tableName"""".stripMargin
+
         sql(createTableStatement)
-        sql("msck repair table " + tableName)
+        sql(s"msck repair table $tableName")
 
       case None =>
         throw new RuntimeException(s"Please provide a valid api key as $NewsApiKeyEnv")
