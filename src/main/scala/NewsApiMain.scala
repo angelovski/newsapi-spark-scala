@@ -189,7 +189,8 @@ object NewsApiMain {
 
         val analyticsDf = numArticlesPerDayDf.join(topTimeframe, "date_col")
 
-        analyticsDf.show()
+        val responseJSON = analyticsDf.toJSON
+        responseJSON.show(truncate = false)
 
 
       case None =>
