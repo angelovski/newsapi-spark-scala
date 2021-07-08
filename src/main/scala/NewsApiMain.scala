@@ -51,7 +51,6 @@ object NewsApiMain {
             .toDF()
 
             //        {Author} {Title} {Date}
-            //        val res = df
             .withColumn("date", col("publishedAt").substr(0, 10))
             .withColumn("custom_field", concat(lit("{"), col("author"), lit("} "),
               lit("{"), col("title"), lit("} "),
@@ -73,7 +72,6 @@ object NewsApiMain {
           val dfFinal = dfByDate.withColumn("articles_by_source", concat_ws("\n===\n", collect_list("article_clean").over(sourceWindow)))
 
           //        store in HDFS
-
           val conf = new Configuration()
           conf.set("fs.hdfs.impl", "org.apache.hadoop.hdfs.DistributedFileSystem")
           conf.set("fs.hdfs.impl", classOf[Nothing].getName)
@@ -143,15 +141,14 @@ object NewsApiMain {
           sql(s"msck repair table $tableName")
 
           //        Analytics:
-
           val numArticlesPerDayDf = sql(
-            s"""SELECT b.date_col,b.source_id,b.total_daily_articles
+            s"""SELECT b.date_col,b.source,b.articles
                |FROM (
                |         SELECT a.date_col,
-               |                a.source_id,
+               |                coalesce(a.source_id,'N/A') AS source,
                |                a.num_articles,
                |                a.rnk,
-               |                SUM(num_articles) OVER (PARTITION BY date_col) AS total_daily_articles
+               |                SUM(num_articles) OVER (PARTITION BY date_col) AS articles
                |         FROM (
                |                  SELECT date_col,
                |                         source_id,
@@ -161,6 +158,7 @@ object NewsApiMain {
                |                  GROUP BY date_col, source_id) a
                |     ) b
                |WHERE b.rnk=1""".stripMargin)
+            .withColumnRenamed("source_id", "source")
 
 
           val topTimeframe = sql(
@@ -184,9 +182,14 @@ object NewsApiMain {
                |                  FROM $tableName) a
                |     ) a
                |WHERE a.rnk = 1""".stripMargin)
+            .withColumn("timeframe", concat(date_format(col("timeframe_from"), "yyyy-MM-dd'T'HH:mm:ss'Z'"), lit("-"), date_format(col("timeframe_to"), "yyyy-MM-dd'T'HH:mm:ss'Z'")))
+            .drop("timeframe_from", "timeframe_to")
 
-          val analyticsDf = numArticlesPerDayDf.join(topTimeframe, "date_col")
+          val analyticsDf = numArticlesPerDayDf
+            .join(topTimeframe, "date_col")
+            .sort("date_col")
 
+          //        JSON format can be further improved
           val responseJSON = analyticsDf.toJSON
           responseJSON.show(truncate = false)
 

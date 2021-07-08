@@ -59,9 +59,6 @@ case class ArticlesResponse(
                              totalResults: Int,
                              status: String)
 
-//case class SourcesResponse(
-//                            sources: Seq[FullSource],
-//                            status: String)
 
 object NewsApiRestClient {
   object Params {
