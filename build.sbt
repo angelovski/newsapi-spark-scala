@@ -7,7 +7,7 @@ sbtVersion := "1.0.0-M4"
 val sparkVersion = "3.0.0"
 val hadoopVersion = "3.2.1"
 val jacksonVersion = "2.10.0"
-
+val scalaTestVersion = "3.2.9"
 
 libraryDependencies ++= Seq(
   "org.scalaj" %% "scalaj-http" % "2.3.0" excludeAll ExclusionRule("com.fasterxml.jackson.core", "jackson-databind"),
@@ -17,7 +17,8 @@ libraryDependencies ++= Seq(
   "org.apache.spark" %% "spark-hive" % sparkVersion excludeAll ExclusionRule("org.apache.hadoop"),
   "org.apache.hadoop" % "hadoop-client" % hadoopVersion excludeAll ExclusionRule("com.fasterxml.jackson.core", "jackson-databind"),
   "org.apache.hadoop" % "hadoop-hdfs" % hadoopVersion excludeAll ExclusionRule("com.fasterxml.jackson.core", "jackson-databind"),
-  "com.fasterxml.jackson.module" %% "jackson-module-scala" % jacksonVersion
+  "com.fasterxml.jackson.module" %% "jackson-module-scala" % jacksonVersion,
+  "org.scalatest" %% "scalatest" % scalaTestVersion % Test
 )
 
 lazy val root = (project in file(".")).
@@ -34,7 +35,8 @@ lazy val root = (project in file(".")).
       "org.apache.spark" %% "spark-hive" % sparkVersion excludeAll ExclusionRule("org.apache.hadoop"),
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion excludeAll ExclusionRule("com.fasterxml.jackson.core", "jackson-databind"),
       "org.apache.hadoop" % "hadoop-hdfs" % hadoopVersion excludeAll ExclusionRule("com.fasterxml.jackson.core", "jackson-databind"),
-      "com.fasterxml.jackson.module" %% "jackson-module-scala" % jacksonVersion
+      "com.fasterxml.jackson.module" %% "jackson-module-scala" % jacksonVersion,
+      "org.scalatest" %% "scalatest" % scalaTestVersion % Test
     )
   )
 

@@ -77,6 +77,8 @@ object NewsApiMain {
           conf.set("fs.hdfs.impl", classOf[Nothing].getName)
           conf.set("fs.defaultFS", "hdfs://127.0.0.1:9000")
 
+          val hdfsHost = "hdfs://127.0.0.1:9000"
+
           //        Raw data + partitioning:
           val dfFinalPartitioned = dfFinal
             .sort("publishedAt")
@@ -86,9 +88,9 @@ object NewsApiMain {
           dfFinalPartitioned.write
             .mode("Overwrite")
             .format("Parquet")
-            .save(s"hdfs://127.0.0.1:9000/raw_data/$tableName/$date")
+            .save(buildHdfsPath(hdfsHost, "raw_data", tableName, Some(date)))
 
-          val dfRawData = spark.read.option("recursiveFileLookup", "true").parquet(s"hdfs://127.0.0.1:9000/raw_data/$tableName/")
+          val dfRawData = spark.read.option("recursiveFileLookup", "true").parquet(buildHdfsPath(hdfsHost, "raw_data", tableName, None) + lit("/"))
 
           //        cleaning data from duplicates if job is run more than once
           val fs = FileSystem.get(conf)
@@ -104,7 +106,7 @@ object NewsApiMain {
             .partitionBy("year", "month")
             .mode("Append")
             .format("Parquet")
-            .save(s"hdfs://127.0.0.1:9000/clean_data/$tableName")
+            .save(buildHdfsPath(hdfsHost,"clean_data",tableName,None))
 
           //        Hive:
           import spark.sql
@@ -205,5 +207,13 @@ object NewsApiMain {
     }
 
 
+  }
+
+  def buildHdfsPath(hdfsHost: String, subDir: String, tableName: String, date: Option[String]): String = {
+
+    date match {
+      case Some(date) => s"$hdfsHost/$subDir/$tableName/$date"
+      case None => s"$hdfsHost/$subDir/$tableName"
+    }
   }
 }
